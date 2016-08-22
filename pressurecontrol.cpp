@@ -1,6 +1,7 @@
 #include "pressurecontrol.h"
 #include <QtSerialPort/QtSerialPort>
-
+#include <QDebug>
+#include <QMessageBox>
 
 
 #define VALVE_PIN 3
@@ -13,6 +14,7 @@ PressureControl::PressureControl(QObject *parent) : QObject(parent)
 {
 
     pressureOffset = START_ZERO_PRESSURE;
+    portNameList = NULL;
     sensorVoltage = -1;
     serialData.clear();
     port = NULL;
@@ -30,6 +32,26 @@ PressureControl::~PressureControl(){
 
 
 
+// signal that the port was opened successfully
+void PressureControl::openPort(QString portName){
+
+    // try to open port
+    port = new QSerialPort();
+    port->setPortName(portName);
+    port->setBaudRate(9600);
+    qDebug() << "opening port " << portName;
+
+    if (port->open(QIODevice::ReadWrite)) {
+        signalPortOpen();
+        qDebug() << "success!!";
+
+    } else {
+        qDebug() << "error: " << port->errorString();
+    }
+
+}
+
+
 
 // signal that the port was closed successfully
 void PressureControl::closePort(){
@@ -37,13 +59,29 @@ void PressureControl::closePort(){
 }
 
 
+// get list of available ports once thread is started
+void PressureControl::getAvailablePorts()
+{
 
-// signal that the port was opened successfully
-void PressureControl::openPort(){
+    // get list of available ports
+    const auto infos = QSerialPortInfo::availablePorts();
+
+    // initialize list
+    if (portNameList == NULL){
+        portNameList = new QList<QString>();
+    } else {
+        portNameList->clear();
+    }
 
 
+    for (const QSerialPortInfo &info : infos) {
+        portNameList->append(info.portName());
 
+    }
+
+    relayPortList(portNameList);
 }
+
 
 
 // send voltage to pressure valve

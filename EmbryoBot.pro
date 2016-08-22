@@ -7,6 +7,9 @@
 QT += core gui
 QT += serialport
 
+QT_CONFIG -= no-pkg-config
+CONFIG += link_pkgconfig
+CONFIG += console
 
 greaterThan(QT_MAJOR_VERSION, 4): QT += widgets
 

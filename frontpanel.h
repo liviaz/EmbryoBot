@@ -28,6 +28,7 @@ private:
 
 
     // general control things
+    QString portName;
     int portOpen;
     QString fileName;
     bool fileExists(QString path);
@@ -38,7 +39,6 @@ private:
     double motorPosition;
     double measurePressureValue;
     double balancePressureValue;
-    int arduinoStartable;
     int valveOpened;
 
 
@@ -60,7 +60,7 @@ signals:
 public slots:
     void arduinoOpenSlot();
     void arduinoClosedSlot();
-    void arduinoReadySlot();
+    void listAvailablePorts(QList<QString> *portNamesList);
 
     void pressureUpdatedSlot();
     void balanceFinished(int successful, int flag);
@@ -88,6 +88,7 @@ private slots:
 
     void on_outIncrement_clicked();
     void on_inIncrement_clicked();
+    void on_arduinoConnectBtn_clicked();
 };
 
 #endif // FRONTPANEL_H
