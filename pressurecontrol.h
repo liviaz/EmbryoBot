@@ -26,7 +26,10 @@ public:
 private:
     QSerialPort *port;
     QList<QString> *portNameList;
-    int sensorVoltage;
+    unsigned int sensorVoltage;
+    unsigned char firstChar;
+    unsigned char secondChar;
+    double pressure;
     double pressureOffset;
     QByteArray serialData;
     void waitUntilMoveDone(double desiredPressure);
@@ -35,7 +38,7 @@ private:
 signals:
     void signalPortClosed();
     void signalPortOpen();
-    void relayPressure();
+    void relayPressure(double pressureOut);
     void balanceFinished(int successful, int flag);
     void updateMotorPosition(double value);
     void relayPortList(QList<QString> *);
@@ -45,8 +48,8 @@ public slots:
     void zeroPressure();
     void moveMotor(int value);
     void goToPressure(double desiredPressure, int flag);
-    void setValve(int value);
-    void setVent(int value);
+    void setValve(bool value);
+    void setVent(bool value);
     void getAvailablePorts();
 
 

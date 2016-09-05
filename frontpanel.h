@@ -39,7 +39,8 @@ private:
     double motorPosition;
     double measurePressureValue;
     double balancePressureValue;
-    int valveOpened;
+    bool valveOpen;
+    bool ventOpen;
 
 
     // camera things
@@ -51,8 +52,8 @@ private:
 
 
 signals:
-    void setValve(int value);
-    void setVent(int value);
+    void setValve(bool value);
+    void setVent(bool value);
     void goToPressure(double desiredPressure, int flag);
     void setMotorPosition(int value); // value is percentage of max stroke
 
@@ -62,7 +63,7 @@ public slots:
     void arduinoClosedSlot();
     void listAvailablePorts(QList<QString> *portNamesList);
 
-    void pressureUpdatedSlot();
+    void pressureUpdatedSlot(double pressureIn);
     void balanceFinished(int successful, int flag);
     void updateMotorPosition(double value);
 

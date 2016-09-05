@@ -20,7 +20,8 @@ FrontPanel::FrontPanel(QWidget *parent) :
 
     balancePressureValue = -0.035;
     measurePressureValue = 0.1;
-    valveOpened = 0;
+    valveOpen = false;
+    ventOpen = false;
 
 
     // setup UI
@@ -28,8 +29,13 @@ FrontPanel::FrontPanel(QWidget *parent) :
     ui->balancePressureDouble->setValue(balancePressureValue);
     ui->measurePressureDouble->setValue(measurePressureValue);
     ui->valveButton->setText("OPEN VALVE");
+    ui->ventButton->setText("VENT");
+    ui->zeroPressure->setEnabled(false);
+    ui->valveButton->setEnabled(false);
+    ui->ventButton->setEnabled(false);
     ui->horizontalSlider->setMaximum(MAX_STROKE);
     ui->actualPressure->setText("+0.000 psi");
+    ui->initializeButton->setEnabled(false);
     ui->balanceButton->setEnabled(false);
     ui->measureButton->setEnabled(false);
     ui->horizontalSlider->setValue((int) motorPosition);
@@ -62,13 +68,16 @@ FrontPanel::FrontPanel(QWidget *parent) :
 
     // set up data connections
     connect(this, SIGNAL(setMotorPosition(int)), pc, SLOT(moveMotor(int)));
+    connect(pc, SIGNAL(updateMotorPosition(double)), this, SLOT(updateMotorPosition(double)));
+
     connect(this, SIGNAL(goToPressure(double,int)), pc, SLOT(goToPressure(double,int)));
     connect(pc, SIGNAL(balanceFinished(int,int)), this, SLOT(balanceFinished(int,int)));
-    connect(pc, SIGNAL(updateMotorPosition(double)), this, SLOT(updateMotorPosition(double)));
+
     connect(ui->zeroPressure, SIGNAL(clicked(bool)), pc, SLOT(zeroPressure()));
-    connect(pc, SIGNAL(relayPressure()), this, SLOT(pressureUpdatedSlot()));
-    connect(this, SIGNAL(setValve(int)), pc, SLOT(setValve(int)));
-    connect(this, SIGNAL(setVent(int)), pc, SLOT(setVent(int)));
+    connect(pc, SIGNAL(relayPressure(double)), this, SLOT(pressureUpdatedSlot(double)));
+
+    connect(this, SIGNAL(setValve(bool)), pc, SLOT(setValve(bool)));
+    connect(this, SIGNAL(setVent(bool)), pc, SLOT(setVent(bool)));
 
 
     // start theads
@@ -78,11 +87,6 @@ FrontPanel::FrontPanel(QWidget *parent) :
 
 FrontPanel::~FrontPanel()
 {
-
-    // close Arduino port
-    if (portOpen){
-        pc->closePort();
-    }
 
 
     delete pc;
@@ -101,17 +105,26 @@ FrontPanel::~FrontPanel()
 void FrontPanel::on_startButton_clicked()
 {
     if (portOpen){
-
         ui->stopButton->setEnabled(true);
+        ui->initializeButton->setEnabled(true);
+        ui->balanceButton->setEnabled(true);
+        ui->measureButton->setEnabled(true);
+        ui->zeroPressure->setEnabled(true);
+        ui->valveButton->setEnabled(true);
+        ui->ventButton->setEnabled(true);
     }
-
-
 }
 
 
 
 void FrontPanel::on_stopButton_clicked()
 {
+
+    // close Arduino port
+    if (portOpen){
+        pc->closePort();
+    }
+
 
 }
 
@@ -147,13 +160,16 @@ void FrontPanel::arduinoOpenSlot()
 {
     portOpen = 1;
     ui->startButton->setEnabled(true);
+    ui->arduinoConnectBtn->setEnabled(false);
     qDebug() << "connection successful!";
 }
 
 
 void FrontPanel::arduinoClosedSlot()
 {
-
+    portOpen = 0;
+    ui->arduinoConnectBtn->setEnabled(true);
+    qDebug() << "connection ended";
 }
 
 
@@ -187,14 +203,30 @@ void FrontPanel::listAvailablePorts(QList<QString> *portNamesList)
 
 void FrontPanel::on_valveButton_clicked()
 {
-
+    if (valveOpen){
+        valveOpen = false;
+        emit setValve(false);
+        ui->valveButton->setText("OPEN VALVE");
+    } else {
+        valveOpen = true;
+        emit setValve(true);
+        ui->valveButton->setText("CLOSE VALVE");
+    }
 }
 
 
 
 void FrontPanel::on_ventButton_clicked()
 {
-
+    if (ventOpen){
+        ventOpen = false;
+        emit setVent(false);
+        ui->ventButton->setText("OPEN VENT");
+    } else {
+        ventOpen = true;
+        emit setVent(true);
+        ui->ventButton->setText("CLOSE VENT");
+    }
 }
 
 
@@ -275,10 +307,18 @@ void FrontPanel::on_inIncrement_clicked()
 
 
 
-void FrontPanel::pressureUpdatedSlot()
+void FrontPanel::pressureUpdatedSlot(double pressureIn)
 {
+    pressure = pressureIn;
 
+    // print out pressure
+    QString data_string;
+    data_string.sprintf("%+01.4f", pressure);
+    data_string.append(" psi");
+    ui->actualPressure->setText(data_string);
 }
+
+
 
 void FrontPanel::balanceFinished(int successful, int flag)
 {

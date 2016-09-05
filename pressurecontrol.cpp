@@ -16,6 +16,7 @@ PressureControl::PressureControl(QObject *parent) : QObject(parent)
     pressureOffset = START_ZERO_PRESSURE;
     portNameList = NULL;
     sensorVoltage = -1;
+    pressure = 0;
     serialData.clear();
     port = NULL;
 
@@ -25,9 +26,12 @@ PressureControl::PressureControl(QObject *parent) : QObject(parent)
 
 // destructor
 PressureControl::~PressureControl(){
-    if (port){
+    if (port && port->isOpen()){
+        port->close();
         delete port;
     }
+
+    emit signalPortClosed();
 }
 
 
@@ -42,7 +46,8 @@ void PressureControl::openPort(QString portName){
     qDebug() << "opening port " << portName;
 
     if (port->open(QIODevice::ReadWrite)) {
-        signalPortOpen();
+        connect(port, SIGNAL(readyRead()), this, SLOT(onDataAvailable()));
+        emit signalPortOpen();
         qDebug() << "success!!";
 
     } else {
@@ -55,7 +60,11 @@ void PressureControl::openPort(QString portName){
 
 // signal that the port was closed successfully
 void PressureControl::closePort(){
-
+    if (port && port->isOpen()){
+        port->close();
+        delete port;
+    }
+    emit signalPortClosed();
 }
 
 
@@ -76,7 +85,6 @@ void PressureControl::getAvailablePorts()
 
     for (const QSerialPortInfo &info : infos) {
         portNameList->append(info.portName());
-
     }
 
     relayPortList(portNameList);
@@ -85,14 +93,52 @@ void PressureControl::getAvailablePorts()
 
 
 // send voltage to pressure valve
-void PressureControl::setValve(int value){
+void PressureControl::setValve(bool value){
 
+    unsigned char valueToWrite;
+
+    if (value){
+        valueToWrite = 0x01;
+    } else {
+        valueToWrite = 0x0;
+    }
+
+    QByteArray valueArray = QByteArray();
+    valueArray.append((unsigned char) VALVE_PIN);
+    valueArray.append((unsigned char) valueToWrite);
+    valueArray.append((unsigned char) valueToWrite);
+    valueArray.append((unsigned char) 0xFF);
+    valueArray.append((unsigned char) 0xFF);
+
+    qDebug() << "array written: " << valueArray;
+
+    port->write(valueArray);
+    port->flush();
 }
 
 
 // send voltage to vent valve
-void PressureControl::setVent(int value){
+void PressureControl::setVent(bool value){
 
+    unsigned char valueToWrite;
+
+    if (value){
+        valueToWrite = 0x01;
+    } else {
+        valueToWrite = 0x0;
+    }
+
+    QByteArray valueArray = QByteArray();
+    valueArray.append((unsigned char) VENT_PIN);
+    valueArray.append((unsigned char) valueToWrite);
+    valueArray.append((unsigned char) valueToWrite);
+    valueArray.append((unsigned char) 0xFF);
+    valueArray.append((unsigned char) 0xFF);
+
+    qDebug() << "array written: " << valueArray;
+
+    port->write(valueArray);
+    port->flush();
 }
 
 
@@ -115,7 +161,23 @@ void PressureControl::zeroPressure(){
 // move to position
 void PressureControl::moveMotor(int value)
 {
+    int valueToWrite = value;
 
+    if (value > 1023){
+        valueToWrite = 1023;
+    } else if (value < 0) {
+        valueToWrite = 0;
+    }
+
+    QByteArray valueArray = QByteArray();
+    valueArray.append((unsigned char) MOTOR_PIN);
+    valueArray.append((unsigned char) valueToWrite);
+    valueArray.append((unsigned char) (valueToWrite >> 8));
+    valueArray.append((unsigned char) 0xFF);
+    valueArray.append((unsigned char) 0xFF);
+
+    port->write(valueArray);
+    port->flush();
 }
 
 
@@ -137,7 +199,27 @@ void PressureControl::goToPressure(double desiredPressure, int flag)
  */
 void PressureControl::onDataAvailable()
 {
+    firstChar = 0;
+    secondChar = 0;
+    serialData.append(port->readAll());
 
+    // check if we've received data
+    if (serialData.size() > 0){
+
+        // if last 2 chars are 0xFF
+        int lastEndIndex = serialData.lastIndexOf((unsigned char) 0xFF);
+        if (lastEndIndex > 2 && ((unsigned char) serialData[lastEndIndex-1] == 0xFF)){
+
+            firstChar = ((unsigned char) serialData[lastEndIndex-3]);
+            secondChar = ((unsigned char) serialData[lastEndIndex-2]);
+
+            sensorVoltage =  firstChar*256 + secondChar;
+            pressure = ((double) sensorVoltage - pressureOffset) / 36.95 * .03614;
+            serialData.clear();
+
+            emit relayPressure(pressure);
+        }
+    }
 }
 
 
