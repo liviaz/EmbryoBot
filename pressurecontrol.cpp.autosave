@@ -206,26 +206,26 @@ void PressureControl::onDataAvailable()
     secondChar = 0;
     serialData.append(port->readAll());
 
-    qDebug() << "serial data: " << serialData;
-    serialData.clear();
+    //qDebug() << "serial data: " << serialData;
+    //serialData.clear();
 
-//    // check if we've received data
-//    if (serialData.size() > 0){
+    // check if we've received data
+    if (serialData.size() > 0){
 
-//        // if last 2 chars are 0xFF
-//        int lastEndIndex = serialData.lastIndexOf((unsigned char) 0xFF);
-//        if (lastEndIndex > 2 && ((unsigned char) serialData[lastEndIndex-1] == 0xFF)){
+        // if last 2 chars are 0xFF
+        int lastEndIndex = serialData.lastIndexOf((unsigned char) 0xFF);
+        if (lastEndIndex > 2 && ((unsigned char) serialData[lastEndIndex-1] == 0xFF)){
 
-//            firstChar = ((unsigned char) serialData[lastEndIndex-3]);
-//            secondChar = ((unsigned char) serialData[lastEndIndex-2]);
+            firstChar = ((unsigned char) serialData[lastEndIndex-3]);
+            secondChar = ((unsigned char) serialData[lastEndIndex-2]);
 
-//            sensorVoltage =  firstChar*256 + secondChar;
-//            pressure = ((double) sensorVoltage - pressureOffset) / 36.95 * .03614;
-//            serialData.clear();
+            sensorVoltage =  firstChar*256 + secondChar;
+            pressure = ((double) sensorVoltage - pressureOffset) / 36.95 * .03614;
+            serialData.clear();
 
-//            emit relayPressure(pressure);
-//        }
-//    }
+            emit relayPressure(pressure);
+        }
+    }
 }
 
 

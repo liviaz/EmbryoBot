@@ -78,6 +78,9 @@ void serialEvent() {
   int numBytesRead = Serial.available();
   Serial.readBytes(readBuff, min(100,numBytesRead));
 
+  Serial.println("readBuff: ");
+  Serial.println(readBuff);
+
   while (currInd < min(100,numBytesRead) && (commandComplete == false)){
 
     // first char is pin number
@@ -87,12 +90,13 @@ void serialEvent() {
 
       // second char is first byte of value
     } else if (currVar == 0x11) {
-      valToWrite = readBuff[currInd];
+      valToWrite = (signed char) readBuff[currInd];
       currVar = 0x12;
 
       // third char is second byte of value
     } else if (currVar == 0x12) {
-      valToWrite = (int) valToWrite*256 + readBuff[currInd];
+
+      valToWrite = (valToWrite << 8) + ((unsigned char) readBuff[currInd]);
       currVar = 0x13;
 
       // fourth char should be 255

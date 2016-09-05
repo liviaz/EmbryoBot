@@ -33,12 +33,13 @@ FrontPanel::FrontPanel(QWidget *parent) :
     ui->zeroPressure->setEnabled(false);
     ui->valveButton->setEnabled(false);
     ui->ventButton->setEnabled(false);
-    ui->horizontalSlider->setMaximum(MAX_STROKE);
+    ui->horizontalSlider->setMinimum(1000);
+    ui->horizontalSlider->setMaximum(2000);
     ui->actualPressure->setText("+0.000 psi");
     ui->initializeButton->setEnabled(false);
     ui->balanceButton->setEnabled(false);
     ui->measureButton->setEnabled(false);
-    ui->horizontalSlider->setValue((int) motorPosition);
+    ui->horizontalSlider->setValue((int) MOTOR_INIT_PCT * 10 + 1000);
     ui->startButton->setEnabled(false);
     ui->stopButton->setEnabled(false);
     ui->arduinoConnectBtn->setEnabled(false);
@@ -235,12 +236,9 @@ void FrontPanel::on_horizontalSlider_sliderReleased()
 {
     // motor position goes from 0-50
     // needs to be converted to 1000-2000
-    double strokePercentage = ((double) ui->horizontalSlider->value())
-            / ((double) MAX_STROKE);
-
-    int voltageToWrite = 1000 + strokePercentage * 1000;
+    int voltageToWrite = ui->horizontalSlider->value();
     emit setMotorPosition(voltageToWrite);
-    motorPosition = strokePercentage * MAX_STROKE;
+    motorPosition = ((double) voltageToWrite - 1000) * MAX_STROKE / 1000;
 }
 
 
