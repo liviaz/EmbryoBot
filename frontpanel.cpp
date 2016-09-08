@@ -278,8 +278,19 @@ void FrontPanel::motorInitialized()
 
 void FrontPanel::on_balanceButton_clicked()
 {
+    ui->balanceButton->setChecked(true);
+    ui->initializeButton->setEnabled(false);
+    ui->measureButton->setEnabled(false);
 
-}
+    ui->zeroPressure->setEnabled(false);
+    ui->valveButton->setEnabled(false);
+
+    balancePressureValue = ui->balancePressureDouble->value();
+    ui->SystemStatusTextEdit->setText("Balancing ... please wait");
+    QThread::msleep(100);
+
+    // call helper function to achieve desired pressure
+    emit goToPressure(balancePressureValue, 0);}
 
 
 
@@ -346,7 +357,14 @@ void FrontPanel::pressureUpdatedSlot(double pressureIn)
 
 void FrontPanel::balanceFinished(int successful, int flag)
 {
-
+    qDebug() << "went to pressure!";
+    ui->SystemStatusTextEdit->setText("");
+    ui->balanceButton->setChecked(false);
+    ui->initializeButton->setEnabled(true);
+    ui->measureButton->setEnabled(true);
+    ui->zeroPressure->setEnabled(true);
+    ui->valveButton->setEnabled(true);
+    ui->ventButton->setEnabled(true);
 }
 
 

@@ -17,6 +17,7 @@ PressureControl::PressureControl(QObject *parent) : QObject(parent)
     pressureOffset = START_ZERO_PRESSURE;
     portNameList = NULL;
     sensorVoltage = -1;
+    motorPosition = -1;
     pressure = 0;
     serialData.clear();
     port = NULL;
@@ -161,19 +162,19 @@ void PressureControl::zeroPressure(){
 // move to position
 void PressureControl::moveMotor(int value)
 {
-    unsigned int valueToWrite = (unsigned int) value;
+    motorPosition = value;
 
     if (value > 2000){
-        valueToWrite = 2000;
+        motorPosition = 2000;
     } else if (value < 1000) {
-        valueToWrite = 1000;
+        motorPosition = 1000;
     }
 
 
     QByteArray valueArray = QByteArray();
     valueArray.append((unsigned char) 0x09);
-    valueArray.append((unsigned char) (valueToWrite >> 8));
-    valueArray.append((unsigned char) valueToWrite);
+    valueArray.append((unsigned char) (motorPosition >> 8));
+    valueArray.append((unsigned char) motorPosition);
     valueArray.append((unsigned char) 0xFF);
     valueArray.append((unsigned char) 0xFF);
 
@@ -185,7 +186,7 @@ void PressureControl::moveMotor(int value)
 
 
 
-// initialize
+// initialize motor position and clear pressure
 void PressureControl::initMotor(int startingValue){
 
     // vent
@@ -196,51 +197,18 @@ void PressureControl::initMotor(int startingValue){
     this->moveMotor(startingValue);
 
     // wait a couple seconds
-    QThread::msleep(500);
+    QThread::msleep(2000);
 
     // close vent
     this->setVent(false);
     QThread::msleep(200);
 
-    double lastPressure = pressure;
-    bool stillMoving = true;
-    int numCycles = 0;
-
-    while (stillMoving && numCycles < 10){
-
-        // wait 1s
-        QThread::msleep(500);
-        qDebug() << "pressure: " << pressure;
-
-
-        // check serial port
-        onDataAvailable();
-
-        qDebug() << "pressure: " << pressure;
-
-        if (qAbs(pressure - lastPressure) < .002){
-            stillMoving = false;
-        } else {
-            lastPressure = pressure;
-            numCycles++;
-            setVent(true);
-            QThread::msleep(500);
-            setVent(false);
-        }
-
-        if (numCycles == 10){
-            qDebug() << "waited too long for pressure to stabilize";
-        }
-
-    }
-
-    qDebug() << "...";
+    waitUntilMoveDone(500, 10, 1);
 
     emit updateMotorPosition(startingValue);
     emit motorInitialized();
-
-
 }
+
 
 
 
@@ -248,6 +216,42 @@ void PressureControl::initMotor(int startingValue){
 // this is the main function used to achieve a desired pressure
 void PressureControl::goToPressure(double desiredPressure, int flag)
 {
+    int numCycles = 0;
+    int maxCycles = 20;
+    double accuracy = .0025; // pressure accuracy
+    int P = 300; // gain
+    int moveIncrement = 0;
+
+    // move motor, wait until it's done, move again, etc.
+    while (qAbs(desiredPressure - pressure) > accuracy && numCycles < maxCycles){
+
+        // determined how much to move motor
+        moveIncrement = (desiredPressure - pressure) * P;
+
+        if (moveIncrement > 0 && moveIncrement < 5){
+            moveIncrement = 5;
+        } else if (moveIncrement < 0 && moveIncrement > -5) {
+            moveIncrement = -5;
+        }
+
+        // move motor
+        motorPosition -= moveIncrement;
+        this->moveMotor(motorPosition);
+
+        numCycles++;
+
+        // wait until it's done before moving again
+        waitUntilMoveDone(200, 20, 0);
+    }
+
+    // give camera some time to adjust in other thread
+    // QThread::msleep(1000);
+
+    if (numCycles == maxCycles && flag == 0){
+        emit balanceFinished(0, flag);
+    }
+
+    emit balanceFinished(1, flag);
 
 }
 
@@ -288,8 +292,36 @@ void PressureControl::onDataAvailable()
 
 
 // wait until pressure has stabilized before moving motor again
-void PressureControl::waitUntilMoveDone(double desiredPressure){
+void PressureControl::waitUntilMoveDone(int waitTimeMs, int maxCycles, bool duringInit){
 
+    onDataAvailable();
+    double lastPressure = pressure;
+    bool stillMoving = true;
+    int numCycles = 0;
+
+    while (stillMoving && numCycles < maxCycles){
+
+        // wait, then update pressure by checking for new serial data
+        QThread::msleep(waitTimeMs);
+        onDataAvailable();
+
+        if (qAbs(pressure - lastPressure) < .002){
+            stillMoving = false;
+        } else {
+            lastPressure = pressure;
+            numCycles++;
+
+            if (duringInit){
+                setVent(true);
+                QThread::msleep(500);
+                setVent(false);
+            }
+        }
+
+        if (numCycles == maxCycles){
+            qDebug() << "waited too long for pressure to stabilize";
+        }
+    }
 
 }
 

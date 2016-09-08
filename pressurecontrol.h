@@ -31,8 +31,9 @@ private:
     unsigned char secondChar;
     double pressure;
     double pressureOffset;
+    int motorPosition;
     QByteArray serialData;
-    void waitUntilMoveDone(double desiredPressure);
+    void waitUntilMoveDone(int waitTimeMs, int maxCycles, bool duringInit);
 
 
 signals:
