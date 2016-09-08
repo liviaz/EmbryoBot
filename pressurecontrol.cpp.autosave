@@ -2,7 +2,8 @@
 #include <QtSerialPort/QtSerialPort>
 #include <QDebug>
 #include <QMessageBox>
-
+#include <stdio.h>
+#include <QThread>
 
 #define VALVE_PIN 3
 #define VENT_PIN 4
@@ -26,12 +27,12 @@ PressureControl::PressureControl(QObject *parent) : QObject(parent)
 
 // destructor
 PressureControl::~PressureControl(){
-    if (port && port->isOpen()){
-        port->close();
+    if (port){
+        if (port->isOpen()){
+            port->close();
+        }
         delete port;
     }
-
-    emit signalPortClosed();
 }
 
 
@@ -62,7 +63,6 @@ void PressureControl::openPort(QString portName){
 void PressureControl::closePort(){
     if (port && port->isOpen()){
         port->close();
-        delete port;
     }
     emit signalPortClosed();
 }
@@ -181,6 +181,58 @@ void PressureControl::moveMotor(int value)
 
     port->write(valueArray);
     port->flush();
+}
+
+
+
+// initialize motor position and clear pressure
+void PressureControl::initMotor(int startingValue){
+
+    // vent
+    this->setVent(true);
+    QThread::msleep(200);
+
+    // move motor to starting position
+    this->moveMotor(startingValue);
+
+    // wait a couple seconds
+    QThread::msleep(2000);
+
+    // close vent
+    this->setVent(false);
+    QThread::msleep(200);
+
+    double lastPressure = pressure;
+    bool stillMoving = true;
+    int numCycles = 0;
+
+    while (stillMoving && numCycles < 10){
+
+        // wait
+        QThread::msleep(500);
+
+        // check serial port
+        onDataAvailable();
+
+        if (qAbs(pressure - lastPressure) < .002){
+            stillMoving = false;
+        } else {
+            lastPressure = pressure;
+            numCycles++;
+            setVent(true);
+            QThread::msleep(500);
+            setVent(false);
+        }
+
+        if (numCycles == 10){
+            qDebug() << "waited too long for pressure to stabilize";
+        }
+
+    }
+
+    this.
+    emit updateMotorPosition(startingValue);
+    emit motorInitialized();
 }
 
 

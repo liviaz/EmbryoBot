@@ -78,20 +78,30 @@ void serialEvent() {
   int numBytesRead = Serial.available();
   Serial.readBytes(readBuff, min(100,numBytesRead));
 
-  Serial.println("readBuff: ");
-  Serial.println(readBuff);
+  //Serial.println("readBuff: ");
+  //Serial.println(readBuff);
 
   while (currInd < min(100,numBytesRead) && (commandComplete == false)){
 
     // first char is pin number
     if (currVar == 0x10) {
-      pinToWrite = readBuff[currInd];
-      currVar = 0x11;
+
+      if (readBuff[currInd] == ((signed char) 0xFF)) {
+        currVar = 0x10;
+      } else {
+        pinToWrite = readBuff[currInd];
+        currVar = 0x11;
+      }
 
       // second char is first byte of value
     } else if (currVar == 0x11) {
-      valToWrite = (signed char) readBuff[currInd];
-      currVar = 0x12;
+
+      if (readBuff[currInd] == ((signed char) 0xFF)) {
+        currVar = 0x10;
+      } else {
+        valToWrite = (signed char) readBuff[currInd];
+        currVar = 0x12;
+      }
 
       // third char is second byte of value
     } else if (currVar == 0x12) {

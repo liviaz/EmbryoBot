@@ -40,8 +40,9 @@ signals:
     void signalPortOpen();
     void relayPressure(double pressureOut);
     void balanceFinished(int successful, int flag);
-    void updateMotorPosition(double value);
+    void updateMotorPosition(int value);
     void relayPortList(QList<QString> *);
+    void motorInitialized();
 
 
 public slots:
@@ -51,6 +52,8 @@ public slots:
     void setValve(bool value);
     void setVent(bool value);
     void getAvailablePorts();
+    void initMotor(int startingValue);
+
 
 
 private slots:

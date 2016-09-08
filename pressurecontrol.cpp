@@ -2,7 +2,8 @@
 #include <QtSerialPort/QtSerialPort>
 #include <QDebug>
 #include <QMessageBox>
-
+#include <stdio.h>
+#include <QThread>
 
 #define VALVE_PIN 3
 #define VENT_PIN 4
@@ -26,12 +27,12 @@ PressureControl::PressureControl(QObject *parent) : QObject(parent)
 
 // destructor
 PressureControl::~PressureControl(){
-    if (port && port->isOpen()){
-        port->close();
+    if (port){
+        if (port->isOpen()){
+            port->close();
+        }
         delete port;
     }
-
-    emit signalPortClosed();
 }
 
 
@@ -62,7 +63,6 @@ void PressureControl::openPort(QString portName){
 void PressureControl::closePort(){
     if (port && port->isOpen()){
         port->close();
-        delete port;
     }
     emit signalPortClosed();
 }
@@ -185,6 +185,64 @@ void PressureControl::moveMotor(int value)
 
 
 
+// initialize
+void PressureControl::initMotor(int startingValue){
+
+    // vent
+    this->setVent(true);
+    QThread::msleep(200);
+
+    // move motor to starting position
+    this->moveMotor(startingValue);
+
+    // wait a couple seconds
+    QThread::msleep(500);
+
+    // close vent
+    this->setVent(false);
+    QThread::msleep(200);
+
+    double lastPressure = pressure;
+    bool stillMoving = true;
+    int numCycles = 0;
+
+    while (stillMoving && numCycles < 10){
+
+        // wait 1s
+        QThread::msleep(500);
+        qDebug() << "pressure: " << pressure;
+
+
+        // check serial port
+        onDataAvailable();
+
+        qDebug() << "pressure: " << pressure;
+
+        if (qAbs(pressure - lastPressure) < .002){
+            stillMoving = false;
+        } else {
+            lastPressure = pressure;
+            numCycles++;
+            setVent(true);
+            QThread::msleep(500);
+            setVent(false);
+        }
+
+        if (numCycles == 10){
+            qDebug() << "waited too long for pressure to stabilize";
+        }
+
+    }
+
+    qDebug() << "...";
+
+    emit updateMotorPosition(startingValue);
+    emit motorInitialized();
+
+
+}
+
+
 
 // control loop to go to a certain pressure
 // this is the main function used to achieve a desired pressure
@@ -206,26 +264,26 @@ void PressureControl::onDataAvailable()
     secondChar = 0;
     serialData.append(port->readAll());
 
-    qDebug() << "serial data: " << serialData;
-    serialData.clear();
+    //qDebug() << "serial data: " << serialData;
+    //serialData.clear();
 
-//    // check if we've received data
-//    if (serialData.size() > 0){
+    // check if we've received data
+    if (serialData.size() > 0){
 
-//        // if last 2 chars are 0xFF
-//        int lastEndIndex = serialData.lastIndexOf((unsigned char) 0xFF);
-//        if (lastEndIndex > 2 && ((unsigned char) serialData[lastEndIndex-1] == 0xFF)){
+        // if last 2 chars are 0xFF
+        int lastEndIndex = serialData.lastIndexOf((unsigned char) 0xFF);
+        if (lastEndIndex > 2 && ((unsigned char) serialData[lastEndIndex-1] == 0xFF)){
 
-//            firstChar = ((unsigned char) serialData[lastEndIndex-3]);
-//            secondChar = ((unsigned char) serialData[lastEndIndex-2]);
+            firstChar = ((unsigned char) serialData[lastEndIndex-3]);
+            secondChar = ((unsigned char) serialData[lastEndIndex-2]);
 
-//            sensorVoltage =  firstChar*256 + secondChar;
-//            pressure = ((double) sensorVoltage - pressureOffset) / 36.95 * .03614;
-//            serialData.clear();
+            sensorVoltage =  firstChar*256 + secondChar;
+            pressure = ((double) sensorVoltage - pressureOffset) / 36.95 * .03614;
+            serialData.clear();
 
-//            emit relayPressure(pressure);
-//        }
-//    }
+            emit relayPressure(pressure);
+        }
+    }
 }
 
 

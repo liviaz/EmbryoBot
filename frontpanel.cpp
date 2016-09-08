@@ -16,7 +16,7 @@ FrontPanel::FrontPanel(QWidget *parent) :
     portName = "";
     portOpen = 0;
     pressure = 0;
-    motorPosition = MOTOR_INIT_PCT * MAX_STROKE / 100; // units of mm
+    motorPosition = 1000 + MOTOR_INIT_PCT * 10;
 
     balancePressureValue = -0.035;
     measurePressureValue = 0.1;
@@ -40,7 +40,7 @@ FrontPanel::FrontPanel(QWidget *parent) :
     ui->balanceButton->setEnabled(false);
     ui->measureButton->setEnabled(false);
     ui->horizontalSlider->setValue((int) MOTOR_INIT_PCT * 10 + 1000);
-    ui->startButton->setEnabled(false);
+    ui->startButton->setEnabled(true);
     ui->stopButton->setEnabled(false);
     ui->arduinoConnectBtn->setEnabled(false);
 
@@ -69,7 +69,10 @@ FrontPanel::FrontPanel(QWidget *parent) :
 
     // set up data connections
     connect(this, SIGNAL(setMotorPosition(int)), pc, SLOT(moveMotor(int)));
-    connect(pc, SIGNAL(updateMotorPosition(double)), this, SLOT(updateMotorPosition(double)));
+    connect(pc, SIGNAL(updateMotorPosition(int)), this, SLOT(updateMotorPosition(int)));
+
+    connect(this, SIGNAL(initMotor(int)), pc, SLOT(initMotor(int)));
+    connect(pc, SIGNAL(motorInitialized()), this, SLOT(motorInitialized()));
 
     connect(this, SIGNAL(goToPressure(double,int)), pc, SLOT(goToPressure(double,int)));
     connect(pc, SIGNAL(balanceFinished(int,int)), this, SLOT(balanceFinished(int,int)));
@@ -88,9 +91,10 @@ FrontPanel::FrontPanel(QWidget *parent) :
 
 FrontPanel::~FrontPanel()
 {
+    if (pc) {
+        delete pc;
+    }
 
-
-    delete pc;
     delete ui;
 }
 
@@ -105,27 +109,21 @@ FrontPanel::~FrontPanel()
 
 void FrontPanel::on_startButton_clicked()
 {
-    if (portOpen){
-        ui->stopButton->setEnabled(true);
-        ui->initializeButton->setEnabled(true);
-        ui->balanceButton->setEnabled(true);
-        ui->measureButton->setEnabled(true);
-        ui->zeroPressure->setEnabled(true);
-        ui->valveButton->setEnabled(true);
-        ui->ventButton->setEnabled(true);
+    if (!portOpen){
+        qDebug() << "ok ...";
+        portName = ui->comPortSelect->currentText();
+        pc->openPort(portName);
     }
+
 }
 
 
 
 void FrontPanel::on_stopButton_clicked()
 {
-
-    // close Arduino port
     if (portOpen){
         pc->closePort();
     }
-
 
 }
 
@@ -150,18 +148,21 @@ void FrontPanel::on_fileNameBox_editingFinished()
 void FrontPanel::on_arduinoConnectBtn_clicked()
 {
 
-    if (!portOpen){
-        qDebug() << "ok ...";
-        portName = ui->comPortSelect->currentText();
-        pc->openPort(portName);
-    }
+
 }
 
 void FrontPanel::arduinoOpenSlot()
 {
     portOpen = 1;
-    ui->startButton->setEnabled(true);
-    ui->arduinoConnectBtn->setEnabled(false);
+
+    ui->stopButton->setEnabled(true);
+    ui->initializeButton->setEnabled(true);
+    ui->balanceButton->setEnabled(true);
+    ui->measureButton->setEnabled(true);
+    ui->zeroPressure->setEnabled(true);
+    ui->valveButton->setEnabled(true);
+    ui->ventButton->setEnabled(true);
+
     qDebug() << "connection successful!";
 }
 
@@ -188,8 +189,10 @@ void FrontPanel::listAvailablePorts(QList<QString> *portNamesList)
 
 
     // allow connection
-    ui->comPortSelect->setCurrentIndex(1);
-    ui->arduinoConnectBtn->setEnabled(true);
+    if (ui->comPortSelect->count() > 1){
+        ui->comPortSelect->setCurrentIndex(1);
+        ui->startButton->setEnabled(true);
+    }
 
 }
 
@@ -236,17 +239,40 @@ void FrontPanel::on_horizontalSlider_sliderReleased()
 {
     // motor position goes from 0-50
     // needs to be converted to 1000-2000
-    int voltageToWrite = ui->horizontalSlider->value();
-    emit setMotorPosition(voltageToWrite);
-    motorPosition = ((double) voltageToWrite - 1000) * MAX_STROKE / 1000;
+    motorPosition = ui->horizontalSlider->value();
+    emit setMotorPosition(motorPosition);
 }
 
 
 
 void FrontPanel::on_initializeButton_clicked()
 {
+    ui->SystemStatusTextEdit->setText("Initializing ... please wait!");
+    ui->initializeButton->setEnabled(false);
+    ui->balanceButton->setEnabled(false);
+    ui->measureButton->setEnabled(false);
+    ui->zeroPressure->setEnabled(false);
+    ui->valveButton->setEnabled(false);
+    ui->ventButton->setEnabled(false);
+
+    motorPosition = MOTOR_INIT_PCT * 10 + 1000;
+    emit initMotor(motorPosition);
+
 
 }
+
+
+void FrontPanel::motorInitialized()
+{
+    ui->SystemStatusTextEdit->setText("");
+    ui->initializeButton->setEnabled(true);
+    ui->balanceButton->setEnabled(true);
+    ui->measureButton->setEnabled(true);
+    ui->zeroPressure->setEnabled(true);
+    ui->valveButton->setEnabled(true);
+    ui->ventButton->setEnabled(true);
+}
+
 
 
 
@@ -327,8 +353,9 @@ void FrontPanel::balanceFinished(int successful, int flag)
 
 
 // update the motor position
-void FrontPanel::updateMotorPosition(double value){
+void FrontPanel::updateMotorPosition(int value){
     motorPosition = value;
+    ui->horizontalSlider->setValue(value);
 }
 
 

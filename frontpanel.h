@@ -36,7 +36,7 @@ private:
     // pressure things
     PressureControl *pc;
     double pressure;
-    double motorPosition;
+    int motorPosition; // 1000 to 2000
     double measurePressureValue;
     double balancePressureValue;
     bool valveOpen;
@@ -56,6 +56,7 @@ signals:
     void setVent(bool value);
     void goToPressure(double desiredPressure, int flag);
     void setMotorPosition(int value); // value is percentage of max stroke
+    void initMotor(int startingValue);
 
 
 public slots:
@@ -65,7 +66,8 @@ public slots:
 
     void pressureUpdatedSlot(double pressureIn);
     void balanceFinished(int successful, int flag);
-    void updateMotorPosition(double value);
+    void updateMotorPosition(int value);
+    void motorInitialized();
 
 
 
